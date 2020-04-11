@@ -980,7 +980,7 @@ func TestLinkSetNs(t *testing.T) {
 	}
 	defer newns.Close()
 
-	link := &Veth{LinkAttrs{Name: "foo"}, "bar", nil}
+	link := &Veth{LinkAttrs{Name: "foo"}, "bar", nil, nil}
 	if err := LinkAdd(link); err != nil {
 		t.Fatal(err)
 	}
@@ -1024,6 +1024,111 @@ func TestLinkSetNs(t *testing.T) {
 		t.Fatal("Other half of veth pair not deleted")
 	}
 
+}
+
+func TestVethPeerNs(t *testing.T) {
+	tearDown := setUpNetlinkTest(t)
+	defer tearDown()
+
+	basens, err := netns.Get()
+	if err != nil {
+		t.Fatal("Failed to get basens")
+	}
+	defer basens.Close()
+
+	newns, err := netns.New()
+	if err != nil {
+		t.Fatal("Failed to create newns")
+	}
+	defer newns.Close()
+
+	link := &Veth{LinkAttrs{Name: "foo"}, "bar", nil, NsFd(basens)}
+	if err := LinkAdd(link); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = LinkByName("bar")
+	if err == nil {
+		t.Fatal("Link bar is in newns")
+	}
+
+	err = netns.Set(basens)
+	if err != nil {
+		t.Fatal("Failed to set basens")
+	}
+
+	_, err = LinkByName("bar")
+	if err != nil {
+		t.Fatal("Link bar is not in basens")
+	}
+
+	err = netns.Set(newns)
+	if err != nil {
+		t.Fatal("Failed to set newns")
+	}
+
+	_, err = LinkByName("foo")
+	if err != nil {
+		t.Fatal("Link foo is not in newns")
+	}
+}
+
+func TestVethPeerNs2(t *testing.T) {
+	tearDown := setUpNetlinkTest(t)
+	defer tearDown()
+
+	basens, err := netns.Get()
+	if err != nil {
+		t.Fatal("Failed to get basens")
+	}
+	defer basens.Close()
+
+	onens, err := netns.New()
+	if err != nil {
+		t.Fatal("Failed to create newns")
+	}
+	defer onens.Close()
+
+	twons, err := netns.New()
+	if err != nil {
+		t.Fatal("Failed to create twons")
+	}
+	defer twons.Close()
+
+	link := &Veth{LinkAttrs{Name: "foo", Namespace: NsFd(onens)}, "bar", nil, NsFd(basens)}
+	if err := LinkAdd(link); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = LinkByName("foo")
+	if err == nil {
+		t.Fatal("Link foo is in twons")
+	}
+
+	_, err = LinkByName("bar")
+	if err == nil {
+		t.Fatal("Link bar is in twons")
+	}
+
+	err = netns.Set(basens)
+	if err != nil {
+		t.Fatal("Failed to set basens")
+	}
+
+	_, err = LinkByName("bar")
+	if err != nil {
+		t.Fatal("Link bar is not in basens")
+	}
+
+	err = netns.Set(onens)
+	if err != nil {
+		t.Fatal("Failed to set onens")
+	}
+
+	_, err = LinkByName("foo")
+	if err != nil {
+		t.Fatal("Link foo is not in onens")
+	}
 }
 
 func TestLinkAddDelVxlan(t *testing.T) {
@@ -1415,7 +1520,7 @@ func TestLinkSubscribe(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	link := &Veth{LinkAttrs{Name: "foo", TxQLen: testTxQLen, MTU: 1400}, "bar", nil}
+	link := &Veth{LinkAttrs{Name: "foo", TxQLen: testTxQLen, MTU: 1400}, "bar", nil, nil}
 	if err := LinkAdd(link); err != nil {
 		t.Fatal(err)
 	}
@@ -1462,7 +1567,7 @@ func TestLinkSubscribeWithOptions(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	link := &Veth{LinkAttrs{Name: "foo", TxQLen: testTxQLen, MTU: 1400}, "bar", nil}
+	link := &Veth{LinkAttrs{Name: "foo", TxQLen: testTxQLen, MTU: 1400}, "bar", nil, nil}
 	if err := LinkAdd(link); err != nil {
 		t.Fatal(err)
 	}
@@ -1496,7 +1601,7 @@ func TestLinkSubscribeAt(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	link := &Veth{LinkAttrs{Name: "test", TxQLen: testTxQLen, MTU: 1400}, "bar", nil}
+	link := &Veth{LinkAttrs{Name: "test", TxQLen: testTxQLen, MTU: 1400}, "bar", nil, nil}
 	if err := nh.LinkAdd(link); err != nil {
 		t.Fatal(err)
 	}
@@ -1538,7 +1643,7 @@ func TestLinkSubscribeListExisting(t *testing.T) {
 	}
 	defer nh.Delete()
 
-	link := &Veth{LinkAttrs{Name: "test", TxQLen: testTxQLen, MTU: 1400}, "bar", nil}
+	link := &Veth{LinkAttrs{Name: "test", TxQLen: testTxQLen, MTU: 1400}, "bar", nil, nil}
 	if err := nh.LinkAdd(link); err != nil {
 		t.Fatal(err)
 	}
